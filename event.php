@@ -27,6 +27,7 @@ if ($filter === 'my' && $userId) {
     $where .= " AND e.id IN (SELECT event_id FROM registrasi WHERE user_id = $userId)";
 }
 
+// Query ambil event + gambar
 if ($userId) {
     $events = $conn->query("
         SELECT e.*,
@@ -52,6 +53,29 @@ if ($userId) {
 }
 
 $kategoriList = ['seminar','workshop','lomba','webinar','conference','bootcamp'];
+
+// Fungsi untuk mendapatkan URL gambar (fallback jika kosong)
+function eventImageUrl($gambar, $kategori) {
+    if (!empty($gambar)) {
+        // Jika sudah berupa URL lengkap (diawali http), pakai langsung
+        if (strpos($gambar, 'http') === 0) {
+            return $gambar;
+        }
+        // Jika hanya nama file, ambil dari folder lokal
+        return 'uploads/events/' . $gambar;
+    }
+    // fallback placeholder...
+    $colors = [
+        'seminar'   => '1E5FA0',
+        'workshop'  => 'C8813A',
+        'lomba'     => '7C3AED',
+        'webinar'   => '2E7D55',
+        'conference'=> 'B45309',
+        'bootcamp'  => 'DC2626'
+    ];
+    $hex = $colors[$kategori] ?? '6B7280';
+    return "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='500' viewBox='0 0 400 500'%3E%3Crect width='400' height='500' fill='%23{$hex}'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='rgba(255,255,255,0.15)' font-size='28' font-family='sans-serif'%3E".urlencode(strtoupper($kategori))."%3C/text%3E%3C/svg%3E";
+}
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -62,7 +86,7 @@ $kategoriList = ['seminar','workshop','lomba','webinar','conference','bootcamp']
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
   <style>
-    /* --- CSS SAMA PERSIS SEPERTI SEBELUMNYA --- */
+        /* ===== CSS Variables (Dark Default) ===== */
     :root {
       --bg:       #0D0F14;
       --bg2:      #13161E;
@@ -82,163 +106,364 @@ $kategoriList = ['seminar','workshop','lomba','webinar','conference','bootcamp']
       --radius:   16px;
       --radius-sm:10px;
       --sidebar-w:240px;
+      --shadow:   0 20px 40px rgba(0,0,0,0.5);
+      --hero-bg: linear-gradient(145deg, #1C1200, #2D1B00, #3D2500);
+      --hero-text: rgba(240,237,232,0.65);
+      --hero-border: rgba(200,150,62,0.15);
+      --chip-bg: var(--surface);
+      --chip-border: var(--border);
+      --chip-active-bg: rgba(200,150,62,0.15);
+      --chip-active-border: rgba(200,150,62,0.4);
+      --card-thumb-bg: #1e1e2f;
+      --badge-bg: rgba(0,0,0,0.55);
+      --badge-text: #fff;
+      --price-gratis: #4ADE80;
+      --price-bayar: #FBBF24;
     }
+
+    /* ===== Light Mode Variables ===== */
+    body.light-mode {
+      --bg:       #F5F7FA;
+      --bg2:      #FFFFFF;
+      --surface:  #FFFFFF;
+      --surface2: #E8ECF1;
+      --border:   rgba(0,0,0,0.08);
+      --gold:     #B8860B;
+      --gold-lt:  #D4A44C;
+      --gold-dk:  #9B7B2C;
+      --amber:    #D4880F;
+      --teal:     #0F766E;
+      --purple:   #6D28D9;
+      --text:     #1E293B;
+      --text-sub: #64748B;
+      --red:      #DC2626;
+      --green:    #16A34A;
+      --shadow:   0 4px 20px rgba(0,0,0,0.08);
+      --hero-bg: linear-gradient(145deg, #FEF9F0, #FFF7E6, #FAF0DC);
+      --hero-text: #4B5563;
+      --hero-border: rgba(184,134,11,0.3);
+      --card-thumb-bg: #E2E8F0;
+      --badge-bg: rgba(255,255,255,0.85);
+      --badge-text: #1E293B;
+      --price-gratis: #16A34A;
+      --price-bayar: #D4880F;
+    }
+
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); display: flex; min-height: 100vh; transition: background 0.3s, color 0.2s; }
-    .sidebar { width: var(--sidebar-w); min-height: 100vh; background: var(--bg2); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 28px 16px; position: fixed; top: 0; left: 0; z-index: 100; transition: background 0.3s, border-color 0.2s; }
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      min-height: 100vh;
+      transition: background 0.3s, color 0.2s;
+    }
+
+    /* ===== SIDEBAR ===== */
+    .sidebar {
+      width: var(--sidebar-w);
+      min-height: 100vh;
+      background: var(--bg2);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 28px 16px;
+      position: fixed;
+      top: 0; left: 0;
+      z-index: 100;
+      transition: background 0.3s, border-color 0.2s;
+    }
     .sidebar-logo { display: flex; align-items: center; gap: 10px; padding: 0 8px; margin-bottom: 36px; }
     .sidebar-logo .ico { width: 36px; height: 36px; background: linear-gradient(135deg,var(--gold-dk),var(--gold)); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
     .sidebar-logo .name { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 17px; }
     .sidebar-logo .name span { color: var(--gold); }
     .sidebar-label { font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--text-sub); padding: 0 12px; margin-bottom: 8px; margin-top: 20px; }
     .nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--radius-sm); color: var(--text-sub); font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s; text-decoration: none; margin-bottom: 2px; }
-    .nav-item:hover { background: var(--surface); color: var(--text); }
+    .nav-item:hover { background: var(--surface2); color: var(--text); }
     .nav-item.active { background: rgba(200,150,62,0.15); color: var(--gold-lt); }
     .nav-ico { font-size: 16px; width: 20px; text-align: center; }
     .sidebar-bottom { margin-top: auto; }
-    .user-chip { display: flex; align-items: center; gap: 10px; padding: 12px; background: var(--surface); border-radius: var(--radius-sm); border: 1px solid var(--border); transition: background 0.3s; }
+    .user-chip { display: flex; align-items: center; gap: 10px; padding: 12px; background: var(--surface2); border-radius: var(--radius-sm); border: 1px solid var(--border); transition: background 0.3s; }
     .user-avatar { width: 36px; height: 36px; background: linear-gradient(135deg,var(--gold-dk),var(--gold)); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: 'Syne',sans-serif; font-weight: 800; font-size: 14px; color: #fff; flex-shrink: 0; }
     .user-info .uname { font-size: 13px; font-weight: 600; }
     .user-info .urole { font-size: 11px; color: var(--gold); }
     .btn-logout { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: var(--radius-sm); color: var(--red); font-size: 13px; text-decoration: none; transition: background 0.2s; margin-top: 8px; }
     .btn-logout:hover { background: rgba(255,85,114,0.1); }
-    .main { margin-left: var(--sidebar-w); flex: 1; padding: 36px; }
-    /* Topbar untuk judul dan toggle */
-    .topbar {
-        display: flex;
-        justify-content: flex-end;
-        align-items: center;
-        margin-bottom: 20px;
+
+    /* ===== THEME TOGGLE BUTTON DI SIDEBAR ===== */
+    .theme-toggle {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      color: var(--text-sub);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-decoration: none;
+      margin-bottom: 12px;
+      background: none;
+      border: none;
+      width: 100%;
+      font-family: 'DM Sans', sans-serif;
     }
-    .theme-toggle-btn {
-        background: var(--surface);
-        border: 1px solid var(--border);
-        border-radius: 40px;
-        padding: 8px 16px;
-        font-size: 13px;
-        font-weight: 500;
-        color: var(--text);
-        cursor: pointer;
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        transition: all 0.2s;
-        backdrop-filter: blur(4px);
+    .theme-toggle:hover { background: var(--surface2); color: var(--text); }
+    .theme-toggle .toggle-icon {
+      width: 20px; height: 20px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
     }
-    .theme-toggle-btn:hover {
-        background: var(--surface2);
-        border-color: var(--gold);
+    .theme-toggle .toggle-icon svg {
+      width: 18px; height: 18px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
     }
-    .hero-banner { position: relative; background: linear-gradient(145deg, #1C1200, #2D1B00, #3D2500); border-radius: var(--radius); padding: 40px 48px; margin-bottom: 32px; overflow: hidden; border: 1px solid rgba(200,150,62,0.15); transition: background 0.3s, border-color 0.2s; }
-    .hero-banner::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse 60% 80% at 90% 50%, rgba(45,212,191,0.08) 0%, transparent 70%), radial-gradient(ellipse 50% 60% at 10% 30%, rgba(200,150,62,0.2) 0%, transparent 60%); }
+    /* Sembunyikan/tampilkan ikon matahari & bulan */
+    .icon-sun { display: none; }
+    .icon-moon { display: block; }
+    body.light-mode .icon-sun { display: block; }
+    body.light-mode .icon-moon { display: none; }
+
+    /* ===== MAIN CONTENT ===== */
+    .main {
+      margin-left: var(--sidebar-w);
+      flex: 1;
+      padding: 36px;
+    }
+
+    /* ===== HERO BANNER ===== */
+    .hero-banner {
+      position: relative;
+      background: var(--hero-bg);
+      border-radius: var(--radius);
+      padding: 40px 48px;
+      margin-bottom: 32px;
+      overflow: hidden;
+      border: 1px solid var(--hero-border);
+      transition: background 0.3s, border-color 0.2s;
+    }
+    .hero-banner::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse 60% 80% at 90% 50%, rgba(45,212,191,0.08) 0%, transparent 70%),
+                  radial-gradient(ellipse 50% 60% at 10% 30%, rgba(200,150,62,0.2) 0%, transparent 60%);
+    }
     .hero-banner .inner { position: relative; z-index: 1; }
-    .hero-tag { display: inline-flex; align-items: center; gap: 6px; background: rgba(200,150,62,0.15); border: 1px solid rgba(200,150,62,0.3); color: var(--gold-lt); font-size: 11px; font-weight: 500; letter-spacing: 1.5px; text-transform: uppercase; padding: 5px 12px; border-radius: 100px; margin-bottom: 16px; }
-    .hero-banner h1 { font-family: 'Syne', sans-serif; font-size: 32px; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 10px; }
+    .hero-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(200,150,62,0.15);
+      border: 1px solid rgba(200,150,62,0.3);
+      color: var(--gold-lt);
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      padding: 5px 12px;
+      border-radius: 100px;
+      margin-bottom: 16px;
+    }
+    .hero-banner h1 {
+      font-family: 'Syne', sans-serif;
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      margin-bottom: 10px;
+    }
     .hero-banner h1 em { font-style: normal; color: var(--gold); }
-    .hero-banner p { color: rgba(240,237,232,0.65); font-size: 14px; max-width: 500px; transition: color 0.2s; }
+    .hero-banner p { color: var(--hero-text); font-size: 14px; max-width: 500px; transition: color 0.2s; }
+
+    /* ===== FILTER BAR ===== */
     .filter-row { display: flex; gap: 12px; align-items: center; margin-bottom: 28px; flex-wrap: wrap; }
     .search-wrap { position: relative; flex: 1; min-width: 220px; }
-    .search-wrap input { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 14px; padding: 11px 14px 11px 40px; outline: none; transition: background 0.3s; }
+    .search-wrap input {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px;
+      padding: 11px 14px 11px 40px;
+      outline: none;
+      transition: background 0.3s, border-color 0.2s;
+    }
     .search-wrap input:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(200,150,62,0.12); }
     .search-wrap .ico { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: var(--text-sub); }
     .filter-chips { display: flex; gap: 8px; flex-wrap: wrap; }
-    .chip { padding: 8px 16px; border-radius: 100px; font-size: 12px; font-weight: 600; border: 1px solid var(--border); background: var(--surface); color: var(--text-sub); text-decoration: none; transition: all 0.2s; }
-    .chip:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
+    .chip {
+      padding: 8px 16px;
+      border-radius: 100px;
+      font-size: 12px;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-sub);
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+    .chip:hover { color: var(--text); border-color: rgba(200,150,62,0.3); }
     .chip.active { background: rgba(200,150,62,0.15); border-color: rgba(200,150,62,0.4); color: var(--gold-lt); }
-    .section-title { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 700; margin-bottom: 20px; }
-    .events-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
-    .event-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; transition: transform 0.25s, box-shadow 0.25s, background 0.3s; display: flex; flex-direction: column; text-decoration: none; color: inherit; }
-    .event-card:hover { transform: translateY(-5px); box-shadow: 0 20px 50px rgba(0,0,0,0.4); border-color: rgba(200,150,62,0.25); }
-    .card-thumb { height: 140px; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; font-size: 48px; }
-    .card-thumb.cat-seminar    { background: linear-gradient(135deg, #2D1B00, #5C3A00); }
-    .card-thumb.cat-workshop   { background: linear-gradient(135deg, #00221A, #004D3A); }
-    .card-thumb.cat-lomba      { background: linear-gradient(135deg, #1A0040, #3D0080); }
-    .card-thumb.cat-webinar    { background: linear-gradient(135deg, #001A00, #003300); }
-    .card-thumb.cat-conference { background: linear-gradient(135deg, #1A1400, #3D3000); }
-    .card-thumb.cat-bootcamp   { background: linear-gradient(135deg, #1A0A00, #3D1A00); }
-    .card-thumb .glow { position: absolute; inset: 0; background: radial-gradient(ellipse 70% 70% at 30% 30%, rgba(255,255,255,0.06) 0%, transparent 70%); }
-    .card-badge { position: absolute; top: 12px; left: 12px; background: rgba(0,0,0,0.5); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.1); border-radius: 100px; padding: 4px 10px; font-size: 11px; font-weight: 600; color: var(--text); }
-    .card-price-tag { position: absolute; top: 12px; right: 12px; background: rgba(0,0,0,0.5); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.1); border-radius: 100px; padding: 4px 10px; font-size: 11px; font-weight: 700; }
-    .card-price-tag.gratis { color: var(--green); border-color: rgba(34,197,94,0.3); }
-    .card-price-tag.bayar  { color: var(--amber); }
-    .card-body { padding: 18px; flex: 1; display: flex; flex-direction: column; }
-    .card-title { font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 700; margin-bottom: 8px; line-height: 1.3; }
-    .card-desc { font-size: 12px; color: var(--text-sub); line-height: 1.6; margin-bottom: 14px; flex: 1; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-    .card-meta { display: flex; gap: 14px; font-size: 12px; color: var(--text-sub); margin-bottom: 16px; }
-    .card-meta span { display: flex; align-items: center; gap: 5px; }
-    .kuota-wrap { margin-bottom: 16px; }
-    .kuota-label { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-sub); margin-bottom: 5px; }
+
+    .section-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 20px;
+    }
+
+    /* ===== GRID KARTU ===== */
+    .events-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    .event-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      transition: transform 0.25s, box-shadow 0.25s, background 0.3s, border-color 0.2s;
+      text-decoration: none;
+      color: inherit;
+      display: flex;
+      flex-direction: column;
+    }
+    .event-card:hover {
+      transform: translateY(-5px);
+      box-shadow: var(--shadow);
+      border-color: rgba(200,150,62,0.2);
+    }
+
+    .card-img-wrap {
+      position: relative;
+      width: 100%;
+      padding-top: 125%;
+      background: var(--card-thumb-bg);
+      overflow: hidden;
+      transition: background 0.3s;
+    }
+    .card-img-wrap img {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .card-badge {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      background: var(--badge-bg);
+      backdrop-filter: blur(6px);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 100px;
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--badge-text);
+      z-index: 2;
+    }
+    .card-price-tag {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: var(--badge-bg);
+      backdrop-filter: blur(6px);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 100px;
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 700;
+      z-index: 2;
+    }
+    .card-price-tag.gratis { color: var(--price-gratis); }
+    .card-price-tag.bayar  { color: var(--price-bayar); }
+
+    .card-body {
+      padding: 12px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: var(--surface);
+      transition: background 0.3s;
+    }
+    .card-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1.3;
+      margin-bottom: 4px;
+      color: var(--text);
+    }
+    .card-meta {
+      display: flex;
+      gap: 8px;
+      font-size: 11px;
+      color: var(--text-sub);
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+    }
+    .card-meta span { display: flex; align-items: center; gap: 4px; }
+
+    .kuota-wrap { margin-bottom: 10px; }
+    .kuota-label { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-sub); margin-bottom: 4px; }
     .kuota-bar { height: 4px; background: var(--surface2); border-radius: 2px; overflow: hidden; }
-    .kuota-fill { height: 100%; border-radius: 2px; background: linear-gradient(90deg, var(--gold-dk), var(--gold)); transition: width 0.5s; }
+    .kuota-fill { height: 100%; border-radius: 2px; background: linear-gradient(90deg, var(--gold-dk), var(--gold)); }
     .kuota-fill.full { background: linear-gradient(90deg, var(--red), #FF8EA3); }
-    .card-btn { display: block; width: 100%; padding: 11px; border-radius: var(--radius-sm); font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700; text-align: center; cursor: pointer; border: none; text-decoration: none; transition: all 0.2s; }
+
+    .card-actions { display: flex; gap: 8px; margin-top: auto; }
+    .card-btn {
+      flex: 1;
+      padding: 8px;
+      border-radius: var(--radius-sm);
+      font-family: 'Syne', sans-serif;
+      font-size: 12px;
+      font-weight: 700;
+      text-align: center;
+      cursor: pointer;
+      border: none;
+      text-decoration: none;
+      transition: all 0.2s;
+      display: inline-block;
+    }
     .card-btn.primary { background: linear-gradient(135deg, var(--gold-dk), var(--gold)); color: #fff; }
     .card-btn.primary:hover { opacity: 0.9; transform: translateY(-1px); }
     .card-btn.enrolled { background: rgba(34,197,94,0.12); color: var(--green); border: 1px solid rgba(34,197,94,0.25); cursor: default; }
     .card-btn.full { background: rgba(255,85,114,0.1); color: var(--red); border: 1px solid rgba(255,85,114,0.2); cursor: default; }
     .card-btn.detail { background: var(--surface2); color: var(--text-sub); border: 1px solid var(--border); }
     .card-btn.detail:hover { color: var(--text); }
-    .empty-state { text-align: center; padding: 80px 20px; color: var(--text-sub); }
-    .empty-state .ico { font-size: 56px; margin-bottom: 16px; }
-    .empty-state h3 { font-family: 'Syne', sans-serif; font-size: 20px; color: var(--text); margin-bottom: 8px; }
+
+    /* Flash & empty */
     .flash { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-radius: var(--radius-sm); font-size: 13px; margin-bottom: 20px; }
     .flash.error   { background: rgba(255,85,114,0.12); border: 1px solid rgba(255,85,114,0.3); color: #FF8EA3; }
     .flash.success { background: rgba(34,197,94,0.12);  border: 1px solid rgba(34,197,94,0.3);  color: #4ADE80; }
+    .empty-state { text-align: center; padding: 80px 20px; color: var(--text-sub); }
+    .empty-state .ico { font-size: 56px; margin-bottom: 16px; }
+    .empty-state h3 { font-family: 'Syne', sans-serif; font-size: 20px; color: var(--text); margin-bottom: 8px; }
 
-    /* Light mode override */
-    body.light-mode {
-        --bg: #F5F7FA;
-        --bg2: #FFFFFF;
-        --surface: #F0F2F5;
-        --surface2: #E4E7EB;
-        --border: rgba(0,0,0,0.1);
-        --text: #1E293B;
-        --text-sub: #64748B;
-        --gold: #C8963E;
-        --gold-lt: #D9A451;
-        --gold-dk: #A87A2E;
-        --amber: #F0A500;
-        --teal: #0D9488;
-        --purple: #7C3AED;
-        --red: #DC2626;
-        --green: #16A34A;
+    /* Responsive */
+    @media (max-width: 1100px) { .events-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 900px) {
+      .sidebar { transform: translateX(-100%); }
+      .main { margin-left: 0; padding: 20px 16px; }
+      .events-grid { grid-template-columns: 1fr; }
     }
-    body.light-mode .hero-banner {
-        background: linear-gradient(145deg, #E8DCC8, #D4C4A8);
-        border-color: rgba(200,150,62,0.3);
-    }
-    body.light-mode .hero-banner p {
-        color: #334155;
-    }
-    body.light-mode .hero-tag {
-        background: rgba(200,150,62,0.2);
-        border-color: rgba(200,150,62,0.4);
-    }
-    body.light-mode .card-thumb .glow {
-        background: radial-gradient(ellipse 70% 70% at 30% 30%, rgba(0,0,0,0.05) 0%, transparent 70%);
-    }
-    body.light-mode .card-badge {
-        background: rgba(255,255,255,0.7);
-        color: #1E293B;
-    }
-    body.light-mode .card-price-tag {
-        background: rgba(255,255,255,0.7);
-    }
-    body.light-mode .chip {
-        background: var(--surface);
-        border-color: var(--border);
-    }
-    body.light-mode .chip.active {
-        background: rgba(200,150,62,0.2);
-        border-color: rgba(200,150,62,0.5);
-    }
-
-    @media (max-width: 900px) { .sidebar { transform: translateX(-100%); } .main { margin-left: 0; padding: 20px 16px; } .events-grid { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
 
-<!-- SIDEBAR (tanpa toggle) -->
+<!-- SIDEBAR -->
 <aside class="sidebar">
   <div class="sidebar-logo">
     <div class="ico">⚡</div>
@@ -253,6 +478,30 @@ $kategoriList = ['seminar','workshop','lomba','webinar','conference','bootcamp']
     <span class="sidebar-label">Admin</span>
     <a class="nav-item" href="dashboard_admin.php"><span class="nav-ico">⚙️</span> Dashboard Admin</a>
   <?php endif; ?>
+
+  <!-- TOMBOL TOGGLE TEMA -->
+  <button class="theme-toggle" onclick="toggleTheme()" title="Ganti tema">
+    <span class="toggle-icon">
+      <!-- Ikon Bulan (mode gelap) -->
+      <svg class="icon-moon" viewBox="0 0 24 24">
+        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+      </svg>
+      <!-- Ikon Matahari (mode terang) -->
+      <svg class="icon-sun" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="5"/>
+        <line x1="12" y1="1" x2="12" y2="3"/>
+        <line x1="12" y1="21" x2="12" y2="23"/>
+        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+        <line x1="1" y1="12" x2="3" y2="12"/>
+        <line x1="21" y1="12" x2="23" y2="12"/>
+        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+      </svg>
+    </span>
+    <span class="toggle-label">Tema</span>
+  </button>
+
   <div class="sidebar-bottom">
     <?php if ($userId): ?>
       <div class="user-chip">
@@ -270,12 +519,9 @@ $kategoriList = ['seminar','workshop','lomba','webinar','conference','bootcamp']
   </div>
 </aside>
 
-<!-- MAIN -->
+<!-- MAIN CONTENT -->
 <main class="main">
-  <!-- Topbar dengan toggle di kanan atas -->
-  <div class="topbar">
-    <button id="theme-toggle" class="theme-toggle-btn">🌓 Mode Terang/Gelap</button>
-  </div>
+  <!-- Tombol tema -->
 
   <?php if ($flash): ?>
   <div class="flash <?= $flash['type'] ?>">
@@ -283,15 +529,16 @@ $kategoriList = ['seminar','workshop','lomba','webinar','conference','bootcamp']
   </div>
   <?php endif; ?>
 
+  <!-- Hero banner (tetap) -->
   <div class="hero-banner">
     <div class="inner">
       <div class="hero-tag">✨ <?= $filter === 'my' ? 'Event Favoritmu' : 'Explore Events' ?></div>
       <h1><?= $filter === 'my' ? 'Event yang <em>Kamu Ikuti</em>' : 'Temukan Event IT<br><em>Terbaik</em> untukmu' ?></h1>
-      <p><?= $filter === 'my' ? 'Berikut daftar event yang sudah kamu daftarkan. Jangan sampai ketinggalan informasi terbaru.' : 'Seminar, workshop, hackathon, hingga webinar — semuanya ada di sini. Daftarkan dirimu dan tingkatkan skill teknologimu.' ?></p>
+      <p><?= $filter === 'my' ? 'Berikut daftar event yang sudah kamu daftarkan.' : 'Seminar, workshop, hackathon, hingga webinar — semuanya ada di sini.' ?></p>
     </div>
   </div>
 
-  <!-- Filter bar -->
+  <!-- Filter (kecuali jika filter 'my') -->
   <?php if ($filter !== 'my'): ?>
   <form method="GET" class="filter-row">
     <div class="search-wrap">
@@ -309,7 +556,6 @@ $kategoriList = ['seminar','workshop','lomba','webinar','conference','bootcamp']
   <?php endif; ?>
 
   <?php
-  $emojis = ['seminar'=>'🎤','workshop'=>'🛠','lomba'=>'🏆','webinar'=>'🎙️','conference'=>'🎓','bootcamp'=>'🚀'];
   $eventCount = $events->num_rows;
   ?>
   <div class="section-title">
@@ -334,53 +580,61 @@ $kategoriList = ['seminar','workshop','lomba','webinar','conference','bootcamp']
       <p>Coba ubah filter atau kata kunci pencarianmu.</p>
     </div>
   <?php else: ?>
+    <!-- ===== GRID KARTU INSTAGRAM-STYLE ===== -->
     <div class="events-grid">
       <?php while ($ev = $events->fetch_assoc()):
         $pct = $ev['kuota'] > 0 ? round($ev['peserta'] / $ev['kuota'] * 100) : 0;
         $isFull = $ev['peserta'] >= $ev['kuota'];
         $isDaftar = ($userId && $ev['sudah_daftar'] == 1);
+        $imgUrl = eventImageUrl($ev['gambar'], $ev['kategori']);
       ?>
       <div class="event-card">
-        <div class="card-thumb cat-<?= $ev['kategori'] ?>">
-          <div class="glow"></div>
-          <span><?= $emojis[$ev['kategori']] ?? '📅' ?></span>
-          <div class="card-badge"><?= ucfirst($ev['kategori']) ?></div>
-          <div class="card-price-tag <?= $ev['harga'] == 0 ? 'gratis' : 'bayar' ?>"><?= rupiah((int)$ev['harga']) ?></div>
+        <!-- GAMBAR POSTER -->
+        <div class="card-img-wrap">
+          <img src="<?= htmlspecialchars($imgUrl) ?>" alt="<?= htmlspecialchars($ev['judul']) ?>" loading="lazy">
+          <!-- Overlay hanya dipakai jika ingin menampilkan judul di atas gambar, tapi kita sudah di body -->
+          <!-- Badge kategori & harga tetap di pojok -->
+          <span class="card-badge"><?= ucfirst($ev['kategori']) ?></span>
+          <span class="card-price-tag <?= $ev['harga'] == 0 ? 'gratis' : 'bayar' ?>"><?= rupiah((int)$ev['harga']) ?></span>
         </div>
+
+        <!-- BODY KARTU -->
         <div class="card-body">
           <div class="card-title"><?= htmlspecialchars($ev['judul']) ?></div>
-          <div class="card-desc"><?= htmlspecialchars($ev['deskripsi']) ?></div>
           <div class="card-meta">
             <span>📅 <?= tglIndo($ev['tanggal']) ?></span>
-            <span>📍 <?= mb_strimwidth(htmlspecialchars($ev['lokasi']), 0, 22, '...') ?></span>
+            <span>📍 <?= htmlspecialchars(mb_strimwidth($ev['lokasi'], 0, 25, '...')) ?></span>
+            <span>👥 <?= $ev['peserta'] ?>/<?= $ev['kuota'] ?></span>
           </div>
+
+          <!-- Kuota bar -->
           <div class="kuota-wrap">
             <div class="kuota-label">
-              <span>Peserta terdaftar</span>
-              <span><?= $ev['peserta'] ?>/<?= $ev['kuota'] ?></span>
+              <span>Kuota terisi</span>
+              <span><?= $pct ?>%</span>
             </div>
             <div class="kuota-bar">
               <div class="kuota-fill <?= $isFull ? 'full' : '' ?>" style="width:<?= min($pct,100) ?>%"></div>
             </div>
           </div>
-          <div style="display: flex; gap: 8px;">
-            <a href="detail_event.php?id=<?= $ev['id'] ?>" class="card-btn detail" style="flex:1">Detail →</a>
+
+          <!-- Tombol aksi -->
+          <div class="card-actions">
+            <a href="detail_event.php?id=<?= $ev['id'] ?>" class="card-btn detail">Detail</a>
             
             <?php if ($userRole === 'admin'): ?>
-              <a href="dashboard_admin.php" class="card-btn detail" style="flex:2; background:var(--surface2);">⚙ Kelola Event</a>
-            <?php elseif ($filter === 'my'): ?>
-              <span class="card-btn enrolled" style="flex:2">✓ Terdaftar</span>
+              <a href="dashboard_admin.php" class="card-btn detail">⚙️ Kelola</a>
             <?php elseif ($isDaftar): ?>
-              <span class="card-btn enrolled" style="flex:2">✓ Terdaftar</span>
+              <span class="card-btn enrolled">✓ Terdaftar</span>
             <?php elseif ($isFull): ?>
-              <span class="card-btn full" style="flex:2">Kuota Penuh</span>
+              <span class="card-btn full">Kuota Penuh</span>
             <?php elseif (!$userId): ?>
-              <a href="login.php" class="card-btn primary" style="flex:2; text-align:center; text-decoration:none;">Daftar Sekarang</a>
+              <a href="login.php" class="card-btn primary">Daftar</a>
             <?php else: ?>
-              <form method="POST" action="detail_event.php" style="flex:2" onsubmit="return confirm('Yakin untuk daftar?')">
+              <form method="POST" action="detail_event.php" style="flex:1" onsubmit="return confirm('Daftar event ini?')">
                 <input type="hidden" name="act" value="daftar">
                 <input type="hidden" name="event_id" value="<?= $ev['id'] ?>">
-                <button type="submit" class="card-btn primary" style="width:100%">Daftar Sekarang</button>
+                <button type="submit" class="card-btn primary" style="width:100%">Daftar</button>
               </form>
             <?php endif; ?>
           </div>
@@ -392,23 +646,34 @@ $kategoriList = ['seminar','workshop','lomba','webinar','conference','bootcamp']
 </main>
 
 <script>
-  // Theme toggle
-  const toggleBtn = document.getElementById('theme-toggle');
-  const currentTheme = localStorage.getItem('theme');
-  if (currentTheme === 'light') {
-    document.body.classList.add('light-mode');
+  function applyTheme(mode) {
+    if (mode === 'light') {
+      document.body.classList.add('light-mode');
+    } else {
+      document.body.classList.remove('light-mode');
+    }
   }
-  if (toggleBtn) {
-    toggleBtn.addEventListener('click', function(e) {
-      e.preventDefault();
-      document.body.classList.toggle('light-mode');
-      if (document.body.classList.contains('light-mode')) {
-        localStorage.setItem('theme', 'light');
-      } else {
-        localStorage.setItem('theme', 'dark');
-      }
-    });
+
+  function toggleTheme() {
+    if (document.body.classList.contains('light-mode')) {
+      document.body.classList.remove('light-mode');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.body.classList.add('light-mode');
+      localStorage.setItem('theme', 'light');
+    }
   }
+
+  // Load tema tersimpan
+  (function() {
+    const saved = localStorage.getItem('theme');
+    if (saved === 'light') {
+      applyTheme('light');
+    } else {
+      applyTheme('dark');
+    }
+  })();
+
   // Auto close flash
   setTimeout(() => {
     const f = document.querySelector('.flash');
