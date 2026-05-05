@@ -110,47 +110,70 @@ $flash = getFlash();
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg:       #0D0F14;
-      --bg2:      #13161E;
-      --surface:  #1A1D27;
-      --surface2: #21253A;
-      --border:   rgba(255,255,255,0.07);
-      --gold:     #C8963E;
-      --gold-lt:  #E8B86D;
-      --gold-dk:  #8A641F;
-      --amber:    #F0A500;
-      --teal:     #2DD4BF;
-      --purple:   #A78BFA;
-      --text:     #F0EDE8;
-      --text-sub: #9B98A0;
-      --red:      #FF5572;
-      --green:    #22C55E;
-      --radius:   16px;
-      --radius-sm:10px;
-      --sidebar-w:240px;
-    }
+  --bg:       #0D0F14;
+  --bg2:      #13161E;
+  --surface:  #1A1D27;
+  --surface2: #21253A;
+  --border:   rgba(255,255,255,0.07);
+  --gold:     #C8963E;
+  --gold-lt:  #E8B86D;
+  --gold-dk:  #8A641F;
+  --amber:    #F0A500;
+  --teal:     #2DD4BF;
+  --purple:   #A78BFA;
+  --text:     #F0EDE8;
+  --text-sub: #9B98A0;
+  --red:      #FF5572;
+  --green:    #22C55E;
+  --radius:   16px;
+  --radius-sm:10px;
+  --sidebar-w:240px;
+  --shadow:   0 20px 40px rgba(0,0,0,0.4);
+  --toggle-hover: var(--surface2);
+}
+body.light-mode {
+  --bg:       #F8F6F0;
+  --bg2:      #FFFFFF;
+  --surface:  #FFFFFF;
+  --surface2: #F4EFE6;
+  --border:   #E8E0D5;
+  --gold:     #C8963E;
+  --gold-lt:  #D4A84C;
+  --gold-dk:  #A67C2E;
+  --amber:    #E5A100;
+  --teal:     #0F766E;
+  --purple:   #7C3AED;
+  --text:     #1A1A1A;
+  --text-sub: #6B6B6B;
+  --red:      #DC2626;
+  --green:    #16A34A;
+  --shadow:   0 8px 24px rgba(0,0,0,0.06);
+  --toggle-hover: #F4EFE6;
+}
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: 'DM Sans', sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      display: flex;
-      min-height: 100vh;
-    }
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  display: flex;
+  min-height: 100vh;
+  transition: background 0.3s, color 0.2s;
+}
 
     /* ── SIDEBAR ───────────────────────────────────── */
     .sidebar {
-      width: var(--sidebar-w);
-      min-height: 100vh;
-      background: var(--bg2);
-      border-right: 1px solid var(--border);
-      display: flex;
-      flex-direction: column;
-      padding: 28px 16px;
-      position: fixed;
-      top: 0; left: 0;
-      z-index: 100;
-    }
+  width: var(--sidebar-w);
+  min-height: 100vh;
+  background: var(--bg2);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: 28px 16px;
+  position: fixed;
+  top: 0; left: 0;
+  z-index: 100;
+  transition: background 0.3s, border-color 0.2s;
+}
 
     .sidebar-logo {
       display: flex; align-items: center; gap: 10px;
@@ -206,6 +229,42 @@ $flash = getFlash();
     .nav-ico { font-size: 16px; width: 20px; text-align: center; }
 
     .sidebar-bottom { margin-top: auto; }
+
+    /* Theme Toggle */
+.theme-toggle {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  color: var(--text-sub);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-decoration: none;
+  margin-bottom: 12px;
+  background: none;
+  border: none;
+  width: 100%;
+  font-family: 'DM Sans', sans-serif;
+}
+.theme-toggle:hover { background: var(--toggle-hover); color: var(--text); }
+.theme-toggle .toggle-icon {
+  width: 20px; height: 20px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.theme-toggle .toggle-icon svg {
+  width: 18px; height: 18px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.icon-sun { display: none; }
+.icon-moon { display: block; }
+body.light-mode .icon-sun { display: block; }
+body.light-mode .icon-moon { display: none; }
 
     .user-chip {
       display: flex;
@@ -596,7 +655,20 @@ $flash = getFlash();
   <a class="nav-item" href="event.php">
     <span class="nav-ico">🌐</span> Lihat Event Page
   </a>
-
+    <!-- Theme Toggle -->
+  <button class="theme-toggle" onclick="toggleTheme()" title="Ganti tema">
+    <span class="toggle-icon">
+      <svg class="icon-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      <svg class="icon-sun" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="5"/>
+        <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+        <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+      </svg>
+    </span>
+    <span class="toggle-label">Tema</span>
+  </button>
   <div class="sidebar-bottom">
     <div class="user-chip">
       <div class="user-avatar"><?= strtoupper(substr($currentUser['nama'], 0, 1)) ?></div>
@@ -886,6 +958,28 @@ $flash = getFlash();
     const f = document.querySelector('.flash');
     if (f) f.style.display = 'none';
   }, 4000);
+  
+  function applyTheme(mode) {
+  if (mode === 'light') {
+    document.body.classList.add('light-mode');
+  } else {
+    document.body.classList.remove('light-mode');
+  }
+}
+function toggleTheme() {
+  if (document.body.classList.contains('light-mode')) {
+    document.body.classList.remove('light-mode');
+    localStorage.setItem('theme', 'dark');
+  } else {
+    document.body.classList.add('light-mode');
+    localStorage.setItem('theme', 'light');
+  }
+}
+(function() {
+  const saved = localStorage.getItem('theme');
+  if (saved === 'light') applyTheme('light');
+  else applyTheme('dark');
+})();
 </script>
 </body>
 </html>
